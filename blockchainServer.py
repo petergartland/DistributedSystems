@@ -6,7 +6,7 @@ import threading
 
 HEADER_LENGTH = 10
 IP = '127.0.0.1'
-PORT = 50000
+PORT = 50001
 TAU  =  .25
 
 print("Server is  live")
@@ -145,8 +145,7 @@ while True:
 			print(f"Received message from {user['data'].decode('utf-8')}: {message['data'].decode('utf-8')}")
 			
 			for client_socket in clients:
-				if client_socket != notified_socket:
-					print("sending  message!\n")
+				#if client_socket != notified_socket:
 					client_socket.send(message["header"] + message["data"] + message["time_header"] + message["time"])
 		
 	for notified_socket in exception_sockets:

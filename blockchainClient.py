@@ -8,10 +8,11 @@ import random
 
 HEADER_LENGTH = 10
 IP = '127.0.0.1'
-PORT = 50000
-DELTA  =  15.0
-RHO  =  .25
+PORT = 50001
+DELTA  =  1.0
+RHO  =  .01
 TAU  =  .25
+BALANCE  =  100
 
 #random.seed()
 #SIGN  =  random.randrange(2)
@@ -21,6 +22,8 @@ TAU  =  .25
 
 sim_time_at_sync  =  time.time()
 sys_time_at_sync  =  time.time()
+blockchain  =  []
+blockchainBuffer  =  []
 
 
 def  current_sim_time():
@@ -39,14 +42,6 @@ client_socket.send(username_header + username)
 
 def getTransactions():
 	while True:
-		'''
-		username_header = client_socket.recv(HEADER_LENGTH)
-		if not len(username_header):
-			print("connection closed by server")
-			sys.exit()
-		username_length = int(username_header.decode('utf-8'))
-		username = client_socket.recv(username_length).decode('utf-8')
-		'''
 		message_header =  client_socket.recv(HEADER_LENGTH)
 		if not len(message_header):
 			print("connection closed by server")
@@ -58,10 +53,14 @@ def getTransactions():
 		timestamp = client_socket.recv(timestamp_length).decode('utf-8')
 		if message[0:4] == 'time':
 			updateTime(message, timestamp)
-		#elif message[0]  ==  '<':
-		#	updateBlockchainBuffer(message, timestamp)
+		elif message[0]  ==  '<':
+			updateBlockchainBuffer(message, timestamp)
 		else:
-			print(f"{message} {timestamp}")
+			print(f"{message} {timestamp}\n")
+			
+
+
+
 
 def updateTime(message, timestamp):
 	global sys_time_at_sync
@@ -72,10 +71,54 @@ def updateTime(message, timestamp):
 	print("updated time: ", current_sim_time(),'\n')
 
 
+
 def updateBlockchainBuffer(message, timestamp):
-	pass
+	global blockchainBuffer
+	transfer = message[1:-1].split(sep=', ')
+	transfer[2]  =  int(transfer[2])
+	transfer.append(float(timestamp))
+	blockchainBuffer.append(transfer)
+	#if transfer[0] != my_username:
+	print(f"{transfer[0]} sent ${transfer[2]} to {transfer[1]} at local time {transfer[3]}\n")
 	
+
+def returnTimestamp(transaction):
+	return transaction[3]
 	
+def updateBlockchain(local_time):
+	global blockchain
+	global blockchainBuffer
+	bufferCopy = blockchainBuffer.copy()
+	bufferCopy.sort(key=returnTimestamp)
+	print("blockchain  Buffer:")
+	for i in bufferCopy:
+		print(i)
+		if i[3] < local_time:
+			blockchain.append(i)
+			blockchainBuffer.remove(i)
+		else:
+			print("")
+			break
+	print("")
+def getBalance():
+	balance  =  BALANCE
+	global blockchain
+	print("Processing...\n")
+	local_time   =  current_sim_time()
+	time.sleep(DELTA+2*TAU)
+	updateBlockchain(local_time)
+	print("block chain:")
+	for i  in  blockchain:
+		print(i)
+		if i[0] == my_username:
+			balance -= i[2]
+		if i[1] == my_username:
+			balance += i[2]
+	print("your balance is:", balance, '\n')
+ 	
+
+
+
 def syncTime():
 	global sys_time_at_sync
 	while True:
@@ -83,7 +126,8 @@ def syncTime():
 			print("updating  time for: ",  my_username)
 			message = 'time'
 			sendMessageHelper(message)
-			time.sleep(TAU*4)
+			time.sleep(DELTA/(2*RHO)-1)
+			#think  of  something  go  for  previous  line!!!
 			
 
 message_list  =  []			
@@ -111,11 +155,11 @@ timeThread.start()
 
 while True:
 	message = input()
-	if message is "balance":
-		pass
-		#scan blockchain
+	if message == "balance":
+		getBalance()
 	else:
-		sendMessageHelper(message)
+		if isValid(message):
+			sendMessageHelper(message)
 	
 
 listenThread.join()
