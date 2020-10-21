@@ -104,7 +104,7 @@ while True:
 		else:
 			message = receive_message(notified_socket)
 			#print(message)
-			if message  ==  "fuck":
+			if message  ==  "pass":
 				continue
 			elif message is False:
 				print(f"Closed connection from {clients[notified_socket]['data'].decode('utf-8')}")
