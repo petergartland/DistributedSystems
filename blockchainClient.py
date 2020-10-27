@@ -11,14 +11,13 @@ PORT = 50000
 DELTA = 1.0 #max difference between two clocks tolerated
 RHO = .01 #drift speed of clock
 TAU = .25 #max time to send message through network
-BALANCE = 100 #starting balance of the clients
+BALANCE = 10 #starting balance of the clients
 
 
 sim_time_at_sync = time.time() #keeps track of when the clock was last synced
 sys_time_at_sync = time.time() #estimates the time when clock is synced
 blockchain = [] #holds the blockchain transactions
-blockchainBuffer = []
-
+blockchainBuffer = [] #temporarily holds transactions before they are moved to the blockchain
 
 def current_sim_time():
 	return sim_time_at_sync + (time.time() - sys_time_at_sync)*(1 + RHO)
@@ -45,13 +44,25 @@ def getTransactions():
 		timestamp_header = client_socket.recv(HEADER_LENGTH)
 		timestamp_length = int(timestamp_header.decode('utf-8'))
 		timestamp = client_socket.recv(timestamp_length).decode('utf-8')
-		if message[0:4] == 'time':
-			updateTime(message, timestamp)
-		elif message[0] == '<':
+		if message[0] == '<':
 			updateBlockchainBuffer(message, timestamp)
+		elif message[0:4] == 'time':
+			updateTime(message, timestamp)
 		else:
 			print(f"{message} {timestamp}\n")
 			
+
+def updateBlockchainBuffer(message, timestamp):
+	'''
+	Stores a transfer into the local blockahin buffer. Called by recieve 			transaction function
+	'''
+	global blockchainBuffer
+	transfer = message[1:-1].split(sep=', ')
+	transfer[2] = int(transfer[2])
+	transfer.append(float(timestamp))
+	blockchainBuffer.append(transfer)
+	print(f"{transfer[0]} sent ${transfer[2]} to {transfer[1]} at local time {transfer[3]}\n")
+
 
 def updateTime(message, timestamp):
 	'''
@@ -76,25 +87,34 @@ def syncTime():
 			message = 'time'
 			sendMessageHelper(message)
 			time.sleep(DELTA/(2*RHO)-1)
-
-
-def updateBlockchainBuffer(message, timestamp):
+			
+			
+def getBalance():
 	'''
-	Stores a transfer into the local blockahin buffer.
+	Called when user askes for current balance. Calls updateBlockchain then checks to see how much money this account has.
 	'''
-	global blockchainBuffer
-	transfer = message[1:-1].split(sep=', ')
-	transfer[2] = int(transfer[2])
-	transfer.append(float(timestamp))
-	blockchainBuffer.append(transfer)
-	print(f"{transfer[0]} sent ${transfer[2]} to {transfer[1]} at local time {transfer[3]}\n")
-	
+	local_time = current_sim_time()  #records when function was called
+	balance = BALANCE
+	global blockchain
+	print("Processing...\n")
+	time.sleep(DELTA+2*TAU)
+	updateBlockchain(local_time) #adds all transactions to the blockchain that occured before function call, i.e. before local_time
+	#print("block chain:")
+	for i  in  blockchain:
+		#print(i)
+		if i[0] == my_username:
+			balance -= i[2]
+		if i[1] == my_username:
+			balance += i[2]
+	return balance
+
 
 def returnTimestamp(transaction):
 	'''
 	used for key in sort function.
 	'''
 	return transaction[3]
+	
 	
 def updateBlockchain(local_time):
 	'''
@@ -104,9 +124,9 @@ def updateBlockchain(local_time):
 	global blockchainBuffer
 	bufferCopy = blockchainBuffer.copy()
 	bufferCopy.sort(key=returnTimestamp)
-	print("blockchain  Buffer:")
+	#print("blockchain  Buffer:")
 	for i in bufferCopy:
-		print(i)
+		#print(i)
 		if i[3] < local_time:
 			blockchain.append(i)
 			blockchainBuffer.remove(i)
@@ -115,28 +135,6 @@ def updateBlockchain(local_time):
 			break
 	print("")
 	
-	
-def getBalance():
-	'''
-	calls updateBlockchain then checks to see how much money this account has.
-	'''
-	balance  =  BALANCE
-	global blockchain
-	print("Processing...\n")
-	local_time   =  current_sim_time()
-	time.sleep(DELTA+2*TAU)
-	updateBlockchain(local_time)
-	print("block chain:")
-	for i  in  blockchain:
-		print(i)
-		if i[0] == my_username:
-			balance -= i[2]
-		if i[1] == my_username:
-			balance += i[2]
-	#print("your balance is:", balance, '\n')
-	return balance
- 	
-
 
 message_list = []			
 def sendMessageHelper(message):
@@ -207,7 +205,7 @@ while True:
 		balance  =  getBalance()
 		print("your balance is:", balance, '\n')
 	else:
-		if isValid(message):	#makes sure the message is in valid format
+		if isValid(message):  #makes sure the transaction is valid
 			sendMessageHelper(message)
 			
 

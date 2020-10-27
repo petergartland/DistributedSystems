@@ -17,7 +17,29 @@ server_socket.listen()
 
 sockets_list = [server_socket] #list of the server socket and client sockets 												connected to server
 usernames = [] #list of the usernames of clients connected to server
-clients = {} # has the client sockets conected to the server as a key and the 						assocaited value is the username provided by the client.
+clients = {} # has the client sockets conected to the server as a key and the 						associated value is the username provided by the client.
+
+
+def getUser(client_socket, client_address):
+	'''
+	gets and prints info from socket that has just made a connection with the 		server socket.
+	'''
+	global sockets_list
+	global clients
+	global usernames
+	try:
+		message_header = client_socket.recv(HEADER_LENGTH)
+		if not len(message_header):
+			return False
+		message_length = int(message_header.decode('utf-8'))
+		user = client_socket.recv(message_length)
+		sockets_list.append(client_socket)
+		clients[client_socket] = {"header" : message_header, "data" : user}
+		usernames.append(user.decode('utf-8'))
+		print(f"Accepted new connection from {client_address[0]} {client_address[1]} username: {user.decode('utf-8')}")
+		
+	except:
+		print("error getting user")
 
 
 def receive_message(client_socket):
@@ -33,7 +55,7 @@ def receive_message(client_socket):
 	timestamp_header = client_socket.recv(HEADER_LENGTH)
 	timestamp_length = int(timestamp_header.decode('utf-8'))
 	timestamp = client_socket.recv(timestamp_length).decode('utf-8')
-	if message.decode('utf-8') == 'time':
+	if message.decode('utf-8') == 'time': #returns current time for a time req.
 		cur_time = time.time()
 		sendMessageHelper("time " + timestamp, str(cur_time), [client_socket])
 		return "pass"
@@ -59,7 +81,7 @@ def isValidMessage(client_socket, message):
 	return True
 
 
-message_list = []			
+message_list = []
 def sendMessageHelper(message, timestamp, clt_sockets):
 	'''
 	Function makes thread then calls sendMessage function. Required to 	simulate network delay.
@@ -83,28 +105,6 @@ def	sendMessage(message, timestamp, clt_sockets):
 	time.sleep(random.uniform(0,TAU))  
 	for sock in clt_sockets:
 		sock.send(message_header + message + timestamp_header + timestamp) 
-
-
-def getUser(client_socket, client_address):
-	'''
-	gets and prints info from socket that has just made a connection with the 		server socket.
-	'''
-	global sockets_list
-	global clients
-	global usernames
-	try:
-		message_header = client_socket.recv(HEADER_LENGTH)
-		if not len(message_header):
-			return False
-		message_length = int(message_header.decode('utf-8'))
-		user = client_socket.recv(message_length)
-		sockets_list.append(client_socket)
-		clients[client_socket] = {"header" : message_header, "data" : user}
-		usernames.append(user.decode('utf-8'))
-		print(f"Accepted new connection from {client_address[0]} {client_address[1]} username: {user.decode('utf-8')}")
-		
-	except:
-		print("error getting user")
 		
 
 def removeUser(notified_socket):
@@ -126,10 +126,10 @@ while True:
 			getUser(client_socket, client_address)
 		else:
 			message = receive_message(notified_socket)
-			if message == "pass":
+			if message == "pass": #time request or invalid transaction
 				continue
 				
-			else:	
+			else: #if message != 'pass' then message is a valid transaction
 				user = clients[notified_socket]
 				print(f"Received message from {user['data'].decode('utf-8')}: {message['data'].decode('utf-8')}")
 				sendMessageHelper(message["data"].decode('utf-8'), 										message["time"].decode('utf-8'), clients)
