@@ -48,6 +48,7 @@ def getUser(client_socket, client_address):
 
 
 def sendUsers(client_socket):
+	print('\nsending users\n')
 	for i in usernames:
 		message = 'new user: ' + i
 		sendMessageHelper(message, '0', [client_socket])
@@ -140,7 +141,7 @@ def	sendMessage(message, timestamp, clt_sockets):
 	'''
 	message  =  pickle.dumps(message)
 	message_header  =  f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-	timestamp  =  timestamp.encode('utf-8')
+	timestamp  =  pickle.dumps(timestamp)
 	timestamp_header  =  f"{len(timestamp):<{HEADER_LENGTH}}".encode('utf-8')
 	time.sleep(random.uniform(0,TAU))  
 	for sock in clt_sockets:
