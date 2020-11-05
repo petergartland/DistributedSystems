@@ -8,7 +8,7 @@ import pickle
 HEADER_LENGTH = 10 #each message starts with an interger = message length
 IP = '127.0.0.1'
 PORT = 50000
-TAU  =  .5 #max time to send message through network
+TAU  =  2 #max time to send message through network
 
 print("Server is  live")
 
@@ -34,6 +34,7 @@ def getUser(client_socket, client_address):
 		message_header = client_socket.recv(HEADER_LENGTH)
 		if not len(message_header):
 			return False
+			
 		message_length = int(message_header.decode('utf-8'))
 		user = client_socket.recv(message_length)
 		sockets_list.append(client_socket)
@@ -48,6 +49,9 @@ def getUser(client_socket, client_address):
 
 
 def sendUsers(client_socket):
+	'''
+sends info of all currently connected processes to the newly connected user and sends the info of the newly connected process to the other processes
+	'''
 	print('\nsending users\n')
 	for i in usernames:
 		message = 'new user: ' + i
@@ -66,46 +70,44 @@ def receive_message(client_socket):
 	if not len(message_header):
 		removeUser(client_socket)
 		return "pass"
+		
 	message_length = int(message_header.decode('utf-8'))
 	message	= client_socket.recv(message_length)
 	timestamp_header = client_socket.recv(HEADER_LENGTH)
 	timestamp_length = int(timestamp_header.decode('utf-8'))
 	timestamp = client_socket.recv(timestamp_length)
-	#if message.decode('utf-8') == 'time': #returns current time for a time req.
-#		cur_time = time.time()
-#		sendMessageHelper("time " + timestamp.decode('utf-8'), str(cur_time), [client_socket])
-#		return "pass"
 	print('message received:', pickle.loads(message))
 	if str(pickle.loads(message))[0]=='[':
 		handleMessage(message, timestamp)
 		return "pass"
+		
 	else:
-		if not isValidMessage(client_socket, message.decode('utf-8')):
-			return 'pass'
 		message_length = int(message_header.decode('utf-8'))
 		return  {"header" : message_header, "data" : message, "time_header" : timestamp_header, "time" : timestamp}
 
 
 def handleMessage(message, timestamp):
-	#contents = message[1:-1].split(sep=', ')
 	contents = pickle.loads(message)
 	print('contents', contents)
-	#print(contents)
-	sendMessageForTT(message, timestamp, [username_to_socket[contents[0]]])
+	t = threading.Thread(target=sendMessageForTT, args=(message, timestamp,  												[username_to_socket[contents[0]]]))
+	t.start()
+	message_list.append(t)
+	if len(message_list) > 5:
+		message_list[0].join()
+		del message_list[0]
 
 
-def isValidMessage(client_socket, message):	
+def sendMessageForTT(message, timestamp, clt_sockets): #this needs a helper function
 	'''
-	client side does most of the work checking if a message is valid, this 			function just checks that the reciever of the money is a known user (is 	logged into the system.
-	''' 
-	message_list = message[1:-1].split(sep = ', ')
-	if message_list[1] not in usernames:
-		response  =  f"{message_list[1]} is an unknown user."
-		message_header  =  f"{len(response):<{HEADER_LENGTH}}".encode('utf-8')
-		timestamp_header  =  f"{0:<{HEADER_LENGTH}}".encode('utf-8')
-		client_socket.send(message_header +  response.encode('utf-8')  +  					timestamp_header)
-		return False			
-	return True
+	Thread sleeps then sends message to server. Required to simulate network 		delay.
+	'''
+	message_header  =  f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
+	print('message header sent:', message_header)
+	timestamp_header  =  f"{len(timestamp):<{HEADER_LENGTH}}".encode('utf-8')
+	time.sleep(random.uniform(0,TAU))  
+	for sock in clt_sockets:
+		sock.send(message_header + message + timestamp_header + timestamp) 
+
 
 
 message_list = []
@@ -119,22 +121,9 @@ def sendMessageHelper(message, timestamp, clt_sockets):
 	if len(message_list) > 5:
 		message_list[0].join()
 		del message_list[0]
-		
-		
-def sendMessageForTT(message, timestamp, clt_sockets):
-	'''
-	Thread sleeps then sends message to server. Required to simulate network 		delay.
-	'''
-	#message  =  message.encode('utf-8')
-	message_header  =  f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-	print('message header sent:', message_header)
-	#timestamp  =  timestamp
-	timestamp_header  =  f"{len(timestamp):<{HEADER_LENGTH}}".encode('utf-8')
-	time.sleep(random.uniform(0,TAU))  
-	for sock in clt_sockets:
-		sock.send(message_header + message + timestamp_header + timestamp) 
-		
-		
+
+
+
 def	sendMessage(message, timestamp, clt_sockets):
 	'''
 	Thread sleeps then sends message to server. Required to simulate network 		delay.
