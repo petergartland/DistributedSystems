@@ -9,7 +9,7 @@ import pickle
 HEADER_LENGTH = 10  #each message starts with an interger = message length
 IP = '127.0.0.1'  
 PORT = 50000
-TAU = 2 #max time to send message through network
+TAU = 3 #max time to send message through network
 BALANCE = 10 #starting balance of the clients
 
 
@@ -64,7 +64,6 @@ class  TT:
 		'''
 		increases what the timetable says that this process knows about itself
 		'''
-	
 		self.times[my_username][my_username]  =  time  
 		
 	
@@ -117,7 +116,6 @@ def getTransactions():
 			
 		else:
 			printMessage(message, timestamp)
-			#print(f"{message} {timestamp}\n")
 			print('')
 			handleMessage(message, timestamp)
 			
@@ -201,7 +199,9 @@ def isValid(message):
 	'''
 	first check if an input message/transaction is in valid format. If so sends transactions or message to appropraite function to be handled.
 	'''
-	if len(message.split(sep=', ')) < 2 or not(message[0]  == '<' or message[0] == '['):
+	
+	if len(message.split(sep=', ')) < 2 or not(message[0]  == '<' or 
+															message[0] == '['):
 		response = "invalid request/format.\nTo get account balance enter  'balance', to send money enter a transaction in the form: <sender, receiver, amount>, to send a message to another user enter a command in the form:	[receiver, message] "
 		print(response,'\n')
 		return
