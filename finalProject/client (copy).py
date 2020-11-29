@@ -13,8 +13,7 @@ PORT = 50000
 TAU = 5 #max time to send message through network
 BALANCE = 10 #starting balance of the clients
 
-MID = 0
-MID_list = []
+
 servers = []
 leader = 'unknown'
 
@@ -45,8 +44,6 @@ def getTransactions():
 		term = pickle.loads(client_socket.recv(term_length))
 		message_length = int(client_socket.recv(HEADER_LENGTH).decode('utf-8'))
 		message = pickle.loads(client_socket.recv(message_length))
-		#MID_length = int(client_socket.recv(HEADER_LENGTH).decode('utf-8'))
-		#MID = pickle.loads(client_socket.recv(MID_length))
 		if mtype == 'message' or 'server response':
 			print(message, 'from:', sender, '\n')
 			if sender != 'message center':
