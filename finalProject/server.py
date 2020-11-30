@@ -7,6 +7,9 @@ import pickle
 import hashlib
 import string
 
+#I added some code at the mtype == 'accept' if statement to only invoke a commit if something from the curren term has been committed. 
+# TODO: Add a kill statement that prevents messages from being sent from the script and see if everything still runs ok.
+
 
 HEADER_LENGTH = 10  #each message starts with an interger = message length
 IP = '127.0.0.1'  
@@ -27,9 +30,9 @@ voted_for = 'NULL'
 HEARTBEAT = 30
 THRESHOLD = 100
 time_at_last_heartbeat_received = 0
-time_at_last_heartbeat_sent = 0
+time_at_last_heartbeat_sent = {}
 BACKOFF = 15
-
+committed_on_current_term = False
 
 my_username = input("Username: ")
 my_username = "server " + my_username
@@ -42,17 +45,21 @@ client_socket.send(username_header + username) #sends username to message center
 
 
 def	election():
+	'''
+	Tries to get server elected if enough time has passed since it last received a message from the old leader.
+	'''
 	global current_term
 	global time_at_last_heartbeat_received
 	global time_at_last_heartbeat_sent
 	global voted_for
 	global state
 	while True:
-		if len(servers) == 2 and time.time() - time_at_last_heartbeat_received > THRESHOLD:
+		if len(servers) == 2 and time.time() - time_at_last_heartbeat_received > THRESHOLD and state != 'leader':
 			time.sleep(random.uniform(0,BACKOFF))
 			if time.time() - time_at_last_heartbeat_received > THRESHOLD: 
 				time_at_last_heartbeat_received = time.time()
-				time_at_last_heartbeat_sent = time.time()
+				for i in time_at_last_heartbeat_sent.keys():
+					time_at_last_heartbeat_sent[i] = time.time()
 				current_term += 1
 				voted_for = my_username
 				state = 'candidate'
@@ -60,63 +67,74 @@ def	election():
 					if len(blockchain) == 0:
 						sendMessageHelper(i, 'vote request', my_username, [0,0])	
 					else:
-						sendMessageHelper(i, 'vote request', my_username, [blockchain[-1].term, len(blockchain)])
+						sendMessageHelper(i, 'vote request', my_username, [blockchain[-1].term, len(blockchain)-1])
 		else:
 			time.sleep(.1)
+	
 			
-			
-def sendHeartbeat():
+'''
+def sendHeartbeat(server):
+	
+	sends are heartbeat to other servers at regular intervals if no other messages are needed to be sent to the other servers
+	
 	global time_at_last_heartbeat_sent
 	global time_at_last_heartbeat_received
 	global state
-	#while True:
 	if time.time() - time_at_last_heartbeat_sent > HEARTBEAT and state == 'leader':
 		time_at_last_heartbeat_sent = time.time()
 		time_at_last_heartbeat_received = time.time()
-		#print("sending heartbeat\n")
-		for i in servers:
-			sendMessageHelper(i, 'heartbeat', my_username, 'leader sending heartbeat')
-	#	time.sleep(HEARTBEAT)
-	#else:
-	#	time.sleep(.1)
-	
-	
+		#for i in servers:
+		#	sendMessageHelper(i, 'heartbeat', my_username, 'leader sending heartbeat')
+		sendMessageHelper(i, 'heartbeat', my_username, 'leader sending heartbeat')
+'''
+
+
 def propigateBlock():
+	'''
+	Tries to replicated the leaders blockchain in the other servers blockchain. send heartbeat if there is no block to propigate.
+	'''
 	global server_index
 	global time_at_last_heartbeat_sent
 	global time_at_last_heartbeat_received
 	global state
 	while True:
-		if state == 'leader' and time.time() - time_at_last_heartbeat_sent > HEARTBEAT:
+		if state == 'leader':
 			i, j = server_index.keys()
-			i_index = server_index[i]
-			j_index = server_index[j]
-			sent_i = False
-			sent_j = False
-			
-			if i_index <= len(blockchain)-1 and blockchain[i_index].nonce != 'NULL':
-				if server_index[i] == 0:
-					sendMessageHelper(i, 'add block', my_username, [-1,-1,blockchain[i_index]])
-				else:
-					sendMessageHelper(i, 'add block', my_username, [blockchain[i_index-1].term, i_index-1, blockchain[i_index]])
-				sent_i = True
-			 	
-			 	
-			if j_index <= len(blockchain)-1 and len(blockchain) > 0 and blockchain[j_index].nonce != 'NULL':
-				if server_index[j] == 0:
-					sendMessageHelper(j, 'add block', my_username, [-1,-1,blockchain[j_index]])
-				else:
-					sendMessageHelper(j, 'add block', my_username, [blockchain[j_index-1].term, j_index-1, blockchain[j_index]])
-				sent_j = True
+			if time.time() - time_at_last_heartbeat_sent[i] > HEARTBEAT:
+				i_index = server_index[i]
+				#sent_i = False
+				#sent_j = False
 				
-			if sent_i and sent_j:
-				time_at_last_heartbeat_sent = time.time()
-				time_at_last_heartbeat_received = time.time()
-			else:	
-				sendHeartbeat()
-			time.sleep(1)
+				if i_index <= len(blockchain)-1 and blockchain[i_index].nonce != 'NULL':
+					if server_index[i] == 0:
+						sendMessageHelper(i, 'add block', my_username, [-1,-1, blockchain[i_index]])
+					else:
+						sendMessageHelper(i, 'add block', my_username, [blockchain[i_index-1].term, i_index-1, blockchain[i_index]])
+					#sent_i = True
+				else:
+					sendMessageHelper(i, 'heartbeat', my_username, 'leader sending heartbeat')
+				time_at_last_heartbeat_sent[i] = time.time() 
+			
+				
+			if time.time() - time_at_last_heartbeat_sent[j] > HEARTBEAT:	 	
+				j_index = server_index[j]
+				if j_index <= len(blockchain)-1 and len(blockchain) > 0 and blockchain[j_index].nonce != 'NULL':
+					if server_index[j] == 0:
+						sendMessageHelper(j, 'add block', my_username, [-1,-1,blockchain[j_index]])
+					else:
+						sendMessageHelper(j, 'add block', my_username, [blockchain[j_index-1].term, j_index-1, blockchain[j_index]])
+					#sent_j = True
+				else:
+					sendMessageHelper(j, 'heartbeat', my_username, 'leader sending heartbeat')	
+			#if sent_i and sent_j:
+			#	time_at_last_heartbeat_sent = time.time()
+			#	time_at_last_heartbeat_received = time.time()
+			#else:	
+			#	sendHeartbeat()
+				time_at_last_heartbeat_sent[j] = time.time()
+			time.sleep(.1)
 		else:
-			time.sleep(1)
+			time.sleep(5)
 
 
 def getRandomString(length):
@@ -126,9 +144,13 @@ def getRandomString(length):
 
 
 class blockchainNode():
+	'''
+	models one block of the blockchain. contains the term, phash, nonce, trnasacitons, and whether or not the block has been commited
+	'''
 	global current_term
 	def __init__(self, node, transaction):
 		self.term = current_term
+		self.committed = False
 		if node == 'NULL':
 			self.phash = 'NULL'
 		else:
@@ -175,6 +197,7 @@ def getTransactions():
 	global leader
 	global server_index
 	global time_at_last_heartbeat_received
+	global committed_on_current_term
 	while True:
 		mtype_length= int(client_socket.recv(HEADER_LENGTH).decode('utf-8'))
 		mtype = pickle.loads(client_socket.recv(mtype_length))
@@ -211,6 +234,7 @@ def getTransactions():
 				addUser(message)
 			if mtype == 'new server':
 				servers.append(message)
+				time_at_last_heartbeat_sent[message] = 0
 				server_index[message] = 0
 				print("server:", message, "added\n")
 				print('servers:', servers)
@@ -228,22 +252,46 @@ def getTransactions():
 				time_at_last_heartbeat_received = time.time()
 				print("checking the block\n")
 				tryBlock(message, sender)
-			if mtype == 'accept': #we are double counting/committing transactions here when both servers respond
+			if mtype == 'accept':
 				print(sender, "accepted the block")
 				print("message:", message)
 				server_index[sender] += 1
-				commitBlock(message)
+				if blockchain[message].term == current_term:
+					committed_on_current_term = True
+				if committed_on_current_term:
+					updateAndNotify(message)
+					sendMessageHelper(sender, 'commit', my_username, message)
+				#put flag here
+				time_at_last_heartbeat_sent[sender] = 0
 			if mtype == 'reject':
 				print(sender, "rejected the block")
 				server_index[sender] -= 1	
+				time_at_last_heartbeat_send[sender] = 0
+			if mtype == 'commit':
+				commitBlock(message)
 		
-		
+
 def commitBlock(message):
 	global blockchain
-	updateAndNotify(blockchain[message])	
+	global balances
+	global estimated_balances
+	if blockchain[message].committed == False:
+		if message != 0 and blockchain[message-1].committed == False:
+			commitBlock(message-1)
+		block = blockchain[message].block
+		for j in block:
+			if len(j) == 3:
+				balances[j[0]] -= int(j[2])
+				balances[j[1]] += int(j[2])
+				estimated_balances[j[0]] -= int(j[2])
+				estimated_balances[j[1]] += int(j[2])
+		blockchain[message].committed = True
 		
 		
 def tryBlock(message, sender):
+	'''
+	checks if a received block should be added to blockchain
+	'''
 	if message[1] == -1:
 		print("i added the block")
 		sendMessageHelper(sender, 'accept', my_username, message[1]+1)
@@ -260,12 +308,12 @@ def tryBlock(message, sender):
 	else:
 		print("i reject the block (i dont contain anything at previous index)")
 		sendMessageHelper(sender, 'reject', my_username, 'block rejected')	
-		
-		
+
+
 def addToBlockchain(message):
 	if len(blockchain) == message[1]+1:
 		blockchain.append(message[2])
-		#update blaances/predicted blaance here
+		#update blaances/predicted blaance here (balance already taken care of in updateAndNotify)
 	else:
 		blockchain[message[1]+1] = message[2]
 		#update balance/predicted balance here		
@@ -278,14 +326,19 @@ def becomeLeader():
 	global server_index
 	global state
 	global leader
+	global committed_on_current_term
 	leader = my_username
 	state = 'leader'
+	committed_on_current_term = False
 	for i in server_index.keys():
 		server_index[i] = max(0, len(blockchain) - 1)
 		
 				
 			
 def handleVoteRequest(message, sender):
+	'''
+	determines if I should vote for an incoming vote request
+	'''
 	global blockchain
 	global time_at_last_heartbeat_received
 	global voted_for
@@ -388,21 +441,29 @@ def getNonce():
 		time.sleep(.1)
 
 
-def updateAndNotify(node): #we are double counting transactions here when both of the servers respond
+
+
+def updateAndNotify(message):
 	'''
 	called once block i is commited. It lets the clients know that their transaction has been completed
 	'''
-	for j in node.block:
-		if len(j) == 1:
-			if state == 'leader':
-				sendMessageHelper(j[0], 'server response', my_username, 'your balance is: ' + str(balances[j[0]])) 
-		elif j != 'NULL':
-			balances[j[0]] -= int(j[2])
-			balances[j[1]] += int(j[2])
-			if state == 'leader':
-				sendMessageHelper(j[0], 'server response', my_username, 'you have successfully sent ' + j[1] + ' $' + str(j[2]))
-			
-			
+	global blockchain
+	node = blockchain[message]
+	if not node.committed:
+		if message != 0 and blockchain[message-1].committed == False:
+			updateAndNotify(message-1)
+		for j in node.block:
+			if len(j) == 1:
+				if state == 'leader':
+					sendMessageHelper(j[0], 'server response', my_username, 'your balance is: ' + str(balances[j[0]])) 
+			elif j != 'NULL':
+				balances[j[0]] -= int(j[2])
+				balances[j[1]] += int(j[2])
+				if state == 'leader':
+					sendMessageHelper(j[0], 'server response', my_username, 'you have successfully sent ' + j[1] + ' $' + str(j[2]))
+		node.committed = True
+
+
 message_list = []			
 def sendMessageHelper(receiver, mtype, sender, message):
 	'''
@@ -427,6 +488,7 @@ def printBlockchain():
 
 def printBlock(i):
 	print('term:', i.term)
+	print('committed', i.committed)
 	print('phash:', i.phash)
 	print('nonce:', i.nonce)
 	print('transaction 1:', i.block[0])
@@ -486,6 +548,8 @@ while True:
 	if message == 'balances':
 		print('balances:', balances)
 		print('esimated balances:', estimated_balances)
+	if message == 'state':
+		print("my state is:", state)
 	else:
 		#sendMessageHelper(message)
 		pass
