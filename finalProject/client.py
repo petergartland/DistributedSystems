@@ -6,15 +6,19 @@ import random
 import pickle
 import hashlib
 
+#TODO: need to impliment timeouts resends and leader change resends using TID's
 
 HEADER_LENGTH = 10  #each message starts with an interger = message length
 IP = '127.0.0.1'  
 PORT = 50000
 TAU = 5 #max time to send message through network
 BALANCE = 10 #starting balance of the clients
+TRANSTIMEOUT = 20
 
-MID = 0
-MID_list = []
+TID = 0
+TID_list = []
+TID_to_transaction = {}
+TID_to_times = {}
 servers = []
 leader = 'unknown'
 
@@ -43,6 +47,8 @@ def getTransactions():
 		sender = pickle.loads(client_socket.recv(sender_length))
 		term_length = int(client_socket.recv(HEADER_LENGTH).decode('utf-8'))
 		term = pickle.loads(client_socket.recv(term_length))
+		ID_length = int(client_socket.recv(HEADER_LENGTH).decode('utf-8'))
+		ID = pickle.loads(client_socket.recv(ID_length))
 		message_length = int(client_socket.recv(HEADER_LENGTH).decode('utf-8'))
 		message = pickle.loads(client_socket.recv(message_length))
 		#MID_length = int(client_socket.recv(HEADER_LENGTH).decode('utf-8'))
@@ -73,6 +79,7 @@ def	sendMessage(message):
 	'''
 	Thread sleeps then sends message to server. Required to simulate network 		delay.
 	'''
+	global TID
 	if leader == 'unknown':
 		receiver = pickle.dumps(servers[0])
 	else:
@@ -85,10 +92,13 @@ def	sendMessage(message):
 	sender_header = f"{len(sender):<{HEADER_LENGTH}}".encode('utf-8')
 	term = pickle.dumps('NULL')
 	term_header = f"{len(term):<{HEADER_LENGTH}}".encode('utf-8')
+	ID = pickle.dumps(TID)
+	ID_header = f"{len(ID):<{HEADER_LENGTH}}".encode('utf-8')
 	message = pickle.dumps(message)
 	message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
 	time.sleep(random.uniform(0,TAU)) 
-	client_socket.send(receiver_header + receiver + mtype_header + mtype + sender_header + sender + term_header + term + message_header + message)
+	client_socket.send(receiver_header + receiver + mtype_header + mtype + sender_header + sender + term_header + term + ID_header + ID + message_header + message)
+	TID += 1
 	
 	
 listenThread = threading.Thread(target=getTransactions)

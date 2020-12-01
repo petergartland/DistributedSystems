@@ -65,18 +65,18 @@ def newServer(user):
 	sender = 'message center'
 	for i in client_to_socket.keys():
 		message = i
-		sendMessage(mtype, sender, message, server_to_socket[user])
+		sendMessage(mtype, sender, message, 0, server_to_socket[user])
 	mtype = 'new server'
 	for i in server_to_socket.keys():
 		if i != user:
 			message = i
-			sendMessage(mtype, sender, message, server_to_socket[user])
+			sendMessage(mtype, sender, message, 0, server_to_socket[user])
 	message = user
 	for i in client_to_socket.keys():
-		sendMessage(mtype, sender, message, client_to_socket[i])
+		sendMessage(mtype, sender, message, 0, client_to_socket[i])
 	for i in server_to_socket.keys():
 		if i != user:
-			sendMessage(mtype, sender, message, server_to_socket[i]) 
+			sendMessage(mtype, sender, message, 0, server_to_socket[i]) 
 		
 
 def newClient(user):
@@ -87,14 +87,14 @@ def newClient(user):
 	sender = 'message center'
 	message = user
 	for i in server_to_socket.keys():
-		sendMessage(mtype, sender, message, server_to_socket[i])
+		sendMessage(mtype, sender, message, 0, server_to_socket[i])
 	mtype = 'new server'
 	for i in server_to_socket.keys():
 		message = i
-		sendMessage(mtype, sender, message, client_to_socket[user])
+		sendMessage(mtype, sender, message, 0, client_to_socket[user])
 
 
-def sendMessage(mtype, sender, message, receiver):
+def sendMessage(mtype, sender, message, ID, receiver):
 	'''
 	sends a message to the receiver socket
 	'''
@@ -104,9 +104,11 @@ def sendMessage(mtype, sender, message, receiver):
 	sender_length = f"{len(sender):<{HEADER_LENGTH}}".encode('utf-8')
 	term = pickle.dumps('NULL')
 	term_length = f"{len(term):<{HEADER_LENGTH}}".encode('utf-8')
+	ID = pickle.dumps(ID)
+	ID_length = f"{len(ID):<{HEADER_LENGTH}}".encode('utf-8')
 	message = pickle.dumps(message)
 	message_length = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-	receiver.send(mtype_length + mtype + sender_length + sender + term_length + term + message_length + message)
+	receiver.send(mtype_length + mtype + sender_length + sender + term_length + term + ID_length + ID + message_length + message)
 
 
 def receive_message(client_socket):
@@ -129,10 +131,13 @@ def receive_message(client_socket):
 		term_length = client_socket.recv(HEADER_LENGTH)
 		term = client_socket.recv(int(term_length.decode('utf-8')))
 		print('term', term)
+		ID_length = client_socket.recv(HEADER_LENGTH)
+		ID = client_socket.recv(int(ID_length.decode('utf-8')))
+		print('ID', ID)
 		message_length = client_socket.recv(HEADER_LENGTH)
 		message = client_socket.recv(int(message_length.decode('utf-8')))
 		print('message', message, '\n')
-		username_to_socket[receiver].send(mtype_length + mtype + sender_length + sender + term_length + term + message_length + message) 
+		username_to_socket[receiver].send(mtype_length + mtype + sender_length + sender + term_length + term + ID_length + ID + message_length + message) 
 		
 		
 
