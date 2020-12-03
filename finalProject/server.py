@@ -371,7 +371,7 @@ def getTransactions():
 						
 			if not kill:
 				if mtype == 'new client':
-					if len(balances) != 2: #@@@@@@@@change this to 3@@@@@@@@@
+					if len(balances) != 3: #@@@@@@@@change this to 3@@@@@@@@@
 						addUser(message)
 				if mtype == 'new server':
 					if len(servers) != 2:
