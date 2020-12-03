@@ -124,20 +124,21 @@ def receive_message(client_socket):
 		print('receiver:', receiver)
 		mtype_length = client_socket.recv(HEADER_LENGTH)
 		mtype = client_socket.recv(int(mtype_length.decode('utf-8')))
-		print('mtype', mtype)
+		print('mtype:', pickle.loads(mtype))
 		sender_length = client_socket.recv(HEADER_LENGTH)
 		sender = client_socket.recv(int(sender_length.decode('utf-8')))
-		print('sender', sender)
+		print('sender:', pickle.loads(sender))
 		term_length = client_socket.recv(HEADER_LENGTH)
 		term = client_socket.recv(int(term_length.decode('utf-8')))
-		print('term', term)
+		print('term:', pickle.loads(term))
 		ID_length = client_socket.recv(HEADER_LENGTH)
 		ID = client_socket.recv(int(ID_length.decode('utf-8')))
-		print('ID', ID)
+		print('ID:', pickle.loads(ID))
 		message_length = client_socket.recv(HEADER_LENGTH)
 		message = client_socket.recv(int(message_length.decode('utf-8')))
-		print('message', message, '\n')
-		username_to_socket[receiver].send(mtype_length + mtype + sender_length + sender + term_length + term + ID_length + ID + message_length + message) 
+		print('message:', message, '\n')
+		if receiver in usernames:
+			username_to_socket[receiver].send(mtype_length + mtype + sender_length + sender + term_length + term + ID_length + ID + message_length + message) 
 		
 		
 
@@ -152,7 +153,7 @@ def removeUser(notified_socket):
 	del username_to_socket[user]
 	if user in client_to_socket:
 		del client_to_socket[user]
-	else:
+	elif user in server_to_socket:
 		del server_to_socket[user]
 	del clients[notified_socket]
 	
